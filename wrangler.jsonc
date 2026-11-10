@@ -22,7 +22,7 @@
     {
       "binding": "DB",
       "database_name": "madrid-mystery-db",
-      "database_id": "9bf4784c-c4de-4882-8522-3353d3184fc9",
+      "database_id": "622cbc4b-82db-4ebc-ab72-f3209e215e69",
       "migrations_dir": "migrations"
     }
   ],
