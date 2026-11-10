@@ -1,53 +1,51 @@
 PRAGMA foreign_keys = ON;
 
+CREATE TABLE IF NOT EXISTS players (
+  id TEXT PRIMARY KEY,
+  token TEXT NOT NULL UNIQUE,
+  alias TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS teams (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  join_code TEXT NOT NULL UNIQUE,
-  created_by TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  invite_code TEXT NOT NULL UNIQUE,
+  owner_player_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (owner_player_id) REFERENCES players(id)
 );
 
-CREATE TABLE IF NOT EXISTS players (
+CREATE TABLE IF NOT EXISTS team_members (
+  team_id TEXT NOT NULL,
+  player_id TEXT NOT NULL,
+  joined_at TEXT NOT NULL,
+  PRIMARY KEY (team_id, player_id),
+  UNIQUE (player_id),
+  FOREIGN KEY (team_id) REFERENCES teams(id),
+  FOREIGN KEY (player_id) REFERENCES players(id)
+);
+
+CREATE TABLE IF NOT EXISTS accusations (
   id TEXT PRIMARY KEY,
-  alias TEXT NOT NULL,
-  token_hash TEXT UNIQUE,
+  cycle_number INTEGER NOT NULL,
+  case_index INTEGER NOT NULL,
+  player_id TEXT NOT NULL,
   team_id TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  last_seen TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE SET NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_players_token ON players(token_hash);
-CREATE INDEX IF NOT EXISTS idx_players_team ON players(team_id);
-
-CREATE TABLE IF NOT EXISTS hints (
-  id TEXT PRIMARY KEY,
-  team_id TEXT NOT NULL,
-  cycle_key TEXT NOT NULL,
-  case_id TEXT NOT NULL,
-  clue_id TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  UNIQUE(team_id, cycle_key, clue_id),
-  FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_hints_cycle ON hints(cycle_key, team_id);
-
-CREATE TABLE IF NOT EXISTS submissions (
-  id TEXT PRIMARY KEY,
-  team_id TEXT NOT NULL,
-  cycle_key TEXT NOT NULL,
-  case_id TEXT NOT NULL,
   suspect_id TEXT NOT NULL,
-  method_id TEXT NOT NULL,
-  motive_id TEXT NOT NULL,
-  evidence_ids TEXT NOT NULL DEFAULT '[]',
-  reasoning TEXT NOT NULL DEFAULT '',
+  motive TEXT NOT NULL,
+  method TEXT NOT NULL,
+  location TEXT NOT NULL,
   score INTEGER NOT NULL,
-  submitted_at TEXT NOT NULL DEFAULT (datetime('now')),
-  UNIQUE(team_id, cycle_key),
-  FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
+  is_correct INTEGER NOT NULL DEFAULT 0,
+  submitted_at TEXT NOT NULL,
+  UNIQUE (cycle_number, player_id),
+  FOREIGN KEY (player_id) REFERENCES players(id),
+  FOREIGN KEY (team_id) REFERENCES teams(id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_submissions_leaderboard ON submissions(cycle_key, score DESC, submitted_at ASC);
+CREATE INDEX IF NOT EXISTS idx_accusations_cycle_score
+  ON accusations(cycle_number, score DESC, submitted_at ASC);
+CREATE INDEX IF NOT EXISTS idx_team_members_player
+  ON team_members(player_id);

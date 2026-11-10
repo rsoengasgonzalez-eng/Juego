@@ -1,29 +1,31 @@
 {
-  "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "madrid-mystery",
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "juego",
   "main": "src/worker.js",
   "compatibility_date": "2026-11-10",
+  "workers_dev": true,
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
-    "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
+    "not_found_handling": "single-page-application"
   },
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "madrid-mystery-db",
-      "database_id": "9bf4784c-c4de-4882-8522-3353d3184fc9",
-      "migrations_dir": "migrations"
-    }
-  ],
   "vars": {
-    "APP_NAME": "Madrid Mystery",
-    "CASE_CYCLE_START": "2026-11-10T09:00:00+01:00",
-    "CASE_DURATION_HOURS": "72",
-    "MAX_TEAM_SIZE": "8"
+    "CASE_CYCLE_START": "2026-11-10T15:00:00.000Z",
+    "CATALOG_SIZE": "1000",
+    "EXPECTED_PLAYERS": "80",
+    "AUTO_TEAM_SIZE": "8"
   },
-  "triggers": {
-    "crons": ["17 3 * * *"]
+  // Para activar equipos y ranking compartido, descomenta este bloque y conserva
+  // el database_id real que ya aparece en tu proyecto de Cloudflare.
+  // "d1_databases": [
+  //   {
+  //     "binding": "DB",
+  //     "database_name": "madrid-mystery-db",
+  //     "database_id": "PEGA_AQUI_TU_DATABASE_ID",
+  //     "migrations_dir": "migrations"
+  //   }
+  // ],
+  "observability": {
+    "enabled": true
   }
 }
