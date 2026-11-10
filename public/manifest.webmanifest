@@ -1,7 +1,7 @@
 {
   "name": "Madrid Mystery",
   "short_name": "Mystery",
-  "description": "Resuelve un nuevo misterio cada 48 horas.",
+  "description": "Resuelve misiones cooperativas y cierra el misterio antes de 48 horas.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#080b12",

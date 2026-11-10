@@ -1,80 +1,105 @@
-# Madrid Mystery 2.0
+# Madrid Mystery 3.0
 
-Juego web móvil para compartir desde WhatsApp, preparado para Cloudflare Workers + D1.
+Juego cooperativo para Cloudflare Workers + D1, pensado para compartirse desde WhatsApp con unos 80 participantes.
 
-## Mejoras incluidas
+## Comportamiento del juego
 
-- **Cada caso dura 48 horas**.
-- **Se desbloquea una pista cada 3 horas**: 16 pistas por expediente, de la hora 0 a la 45.
-- **La acusación final se abre en la hora 42**, dejando seis horas para enviar la teoría.
-- **Catálogo determinista de 1.000 casos**: son 2.000 días de rotación antes de repetir un índice de caso.
-- **Grupos automáticos y equilibrados**: con la configuración predeterminada, crea 10 brigadas de 8 plazas para unos 80 participantes.
-- **Sin elección manual de equipo**: al registrar el alias, D1 asigna al jugador al grupo menos poblado.
-- **Protección de capacidad bajo concurrencia**: la inserción vuelve a comprobar el límite de ocho en la propia escritura D1.
-- **Desbordamiento seguro**: el participante 81 abre una brigada adicional; nunca se sobrellena una brigada existente.
-- **Pistas protegidas en el servidor**: las pistas bloqueadas no incluyen su contenido en la respuesta API.
-- **Modo individual de respaldo**: el expediente se abre aunque D1 no esté configurada o todavía no tenga tablas; equipos y ranking requieren D1.
-- PWA, diseño adaptable a móvil, ranking, puntuación y solución del caso anterior.
+- Cada expediente tiene una duración máxima de **48 horas**.
+- Se publica una de las **16 pistas cada 30 minutos**: horas 0, 0:30, 1:00…7:30.
+- Cada caso incluye **5 misiones obligatorias** compartidas por el equipo.
+- Las misiones se habilitan al llegar a las pistas 5, 7, 9, 12 y 15.
+- La acusación final permanece bloqueada hasta completar correctamente las cinco misiones.
+- Cuando un equipo completa las misiones y envía su acusación, **termina inmediatamente**, sin esperar al cierre de 48 horas.
+- El cierre de un equipo no afecta a los demás: el mismo caso permanece abierto para el resto hasta que terminen o venza el límite de 48 horas.
+- El calendario global no se adelanta cuando todos terminan; el siguiente caso comienza en la siguiente frontera de 48 horas.
+- Las respuestas, soluciones y pistas bloqueadas no se envían al navegador.
+- El catálogo mantiene **1.000 casos deterministas**.
 
-## Lógica de grupos para 80 participantes
+## Grupos
 
-La configuración predeterminada es:
+### Asignación general
+
+La configuración predeterminada prepara 10 brigadas de 8 plazas para unos 80 participantes. Cada nueva alta entra en el grupo menos poblado. La capacidad se comprueba de nuevo en la escritura D1 para evitar sobreasignaciones concurrentes. El participante 81 abre una brigada adicional.
+
+### Grupo fijo de dos usuarias
+
+El administrador puede reservar un grupo fijo para dos personas mediante dos códigos privados. Las usuarias escriben su código en el campo opcional de registro; no eligen grupo ni ven el código de la otra persona.
+
+Configura los códigos como secreto, nunca dentro de GitHub:
+
+```bash
+npx wrangler secret put FIXED_TEAM_CODES
+```
+
+Cuando Wrangler solicite el valor, introduce dos códigos separados por coma:
+
+```text
+CODIGO-PRIVADO-ANA,CODIGO-PRIVADO-LUCIA
+```
+
+El Worker acepta como máximo los dos primeros códigos. Cada código solo puede usarse una vez y ambos asignan al grupo definido por:
 
 ```jsonc
-"EXPECTED_PLAYERS": "80",
-"AUTO_TEAM_SIZE": "8"
+"FIXED_TEAM_NAME": "Dúo especial"
 ```
 
-El sistema prepara 10 brigadas temáticas. Para cada alta:
+Para cambiar a las dos usuarias después de que se hayan registrado, no reutilices códigos antiguos. Elimina o reasigna primero sus filas desde D1 y después cambia el secreto.
 
-1. Lee el número de miembros de todas las brigadas automáticas.
-2. Elige la brigada con menos miembros; en empate, usa el orden estable de brigada.
-3. Inserta al jugador solo si la brigada sigue por debajo de ocho miembros.
-4. Si otra alta concurrente llenó esa brigada, repite la selección.
-5. Si las diez están completas, crea una brigada de desbordamiento.
+## Persistencia D1
 
-Con 80 altas, la distribución final es exactamente `8,8,8,8,8,8,8,8,8,8`. Durante las altas, la diferencia entre cualquiera de las diez brigadas es como máximo una persona.
+D1 es obligatoria. La versión 3 guarda:
 
-## Estructura
+| Información | Tabla |
+|---|---|
+| Usuarios, token, alias y plaza fija | `players` |
+| Grupos, tipo y capacidad | `teams` |
+| Miembros del grupo | `team_members` |
+| Instancia y fechas de cada caso | `case_runs` |
+| Estado de un equipo en el caso | `team_case_state` |
+| Pistas desbloqueadas por equipo | `team_clue_unlocks` |
+| Estado y puntuación de misiones | `team_mission_progress` |
+| Todos los intentos de misión | `mission_attempts` |
+| Acusación única del equipo | `team_accusations` |
+| Resultado final y puntuación | `team_case_results` |
+| Libro mayor de puntos | `score_events` |
+
+`team_case_results` y `team_case_state` permiten que un equipo quede terminado mientras los demás siguen investigando el mismo `cycle_number`.
+
+## Migraciones
+
+La carpeta `migrations` contiene:
+
+- `0001_initial.sql`: esquema original de usuarios, grupos y acusaciones.
+- `0002_missions_persistent_progress.sql`: actualización completa para misiones, pistas persistentes, acusaciones de equipo, resultados y puntuación.
+
+Para una base nueva se aplican ambas en orden. Para una base existente que ya tenga la migración 0001, Wrangler aplicará solamente la 0002.
+
+```bash
+npm install
+npx wrangler d1 migrations list madrid-mystery-db --remote
+npx wrangler d1 migrations apply madrid-mystery-db --remote
+```
+
+Confirma con `Y` cuando se solicite. No ejecutes 0002 dos veces manualmente: contiene columnas `ALTER TABLE` y está diseñada para quedar registrada por el sistema de migraciones.
+
+### Aplicación desde el panel de Cloudflare
+
+Si no usas la CLI:
+
+1. Abre **Storage & databases → D1 → madrid-mystery-db → Console**.
+2. En una base nueva ejecuta primero `0001_initial.sql` y después `0002_missions_persistent_progress.sql`.
+3. En la base anterior del juego ejecuta únicamente `0002_missions_persistent_progress.sql` si 0001 ya se aplicó.
+4. Conserva una copia de seguridad antes de actualizar una base con datos reales.
+
+## Configuración de Cloudflare
+
+En `wrangler.jsonc`, sustituye:
 
 ```text
-Madrid-Mystery-48h/
-├── migrations/0001_initial.sql
-├── public/
-│   ├── app.js
-│   ├── icon.svg
-│   ├── index.html
-│   ├── manifest.webmanifest
-│   ├── styles.css
-│   └── sw.js
-├── src/
-│   ├── game-engine.js
-│   ├── team-engine.js
-│   └── worker.js
-├── tests/
-│   ├── game-engine.test.js
-│   └── team-engine.test.js
-├── package.json
-└── wrangler.jsonc
+REPLACE_WITH_YOUR_D1_DATABASE_UUID
 ```
 
-## Publicación desde GitHub + Cloudflare
-
-### 1. Sustituye los archivos del repositorio
-
-Sube **el contenido** de esta carpeta a la raíz del repositorio. La raíz debe contener `package.json`, `wrangler.jsonc`, `src`, `public`, `migrations` y `tests`.
-
-### 2. Conserva tu `database_id`
-
-En `wrangler.jsonc`, descomenta el bloque `d1_databases` y sustituye:
-
-```text
-PEGA_AQUI_TU_DATABASE_ID
-```
-
-por el identificador real de `madrid-mystery-db` que ya muestra Cloudflare. No uses el nombre de la base como `database_id`.
-
-El bloque final debe tener esta forma:
+por el UUID real de `madrid-mystery-db`:
 
 ```jsonc
 "d1_databases": [
@@ -89,62 +114,78 @@ El bloque final debe tener esta forma:
 
 El binding debe llamarse exactamente `DB`.
 
-### 3. Aplica la migración
-
-Desde el panel de Cloudflare, abre:
-
-```text
-Storage & databases → D1 → madrid-mystery-db → Console
-```
-
-Copia y ejecuta todo el contenido de `migrations/0001_initial.sql`. Las sentencias usan `IF NOT EXISTS`, por lo que pueden ejecutarse sobre una instalación que ya tenga esas tablas.
-
-Alternativa con Wrangler:
-
-```bash
-npm install
-npx wrangler d1 migrations apply madrid-mystery-db --remote
-```
-
-### 4. Define el inicio del ciclo
-
-En `wrangler.jsonc`, ajusta:
+Variables incluidas:
 
 ```jsonc
-"CASE_CYCLE_START": "2026-11-10T15:00:00.000Z"
+"CASE_CYCLE_START": "2026-11-10T15:00:00.000Z",
+"CATALOG_SIZE": "1000",
+"EXPECTED_PLAYERS": "80",
+"AUTO_TEAM_SIZE": "8",
+"FIXED_TEAM_NAME": "Dúo especial"
 ```
 
-La fecha está en UTC. No hace falta cron: el Worker calcula el caso y las pistas a partir del reloj del servidor.
+- `CASE_CYCLE_START`: inicio UTC de la rotación de 48 horas.
+- `EXPECTED_PLAYERS`: número previsto de participantes.
+- `AUTO_TEAM_SIZE`: límite de cada brigada automática.
+- `FIXED_TEAM_NAME`: nombre visible del grupo fijo de dos.
+- `FIXED_TEAM_CODES`: secreto de Cloudflare con los dos códigos; no aparece en `wrangler.jsonc`.
 
-### 5. Despliega
+## Despliegue
 
 ```bash
 npm install
 npm test
+npx wrangler d1 migrations apply madrid-mystery-db --remote
+npx wrangler secret put FIXED_TEAM_CODES
 npm run deploy
 ```
 
-En una integración de GitHub, usa:
+En la integración GitHub de Cloudflare:
 
+- **Root directory:** `/`
 - **Build command:** `npm ci && npm test`
 - **Deploy command:** `npx wrangler deploy`
-- **Root directory:** `/`
 
-### 6. Verifica
+## Verificación
 
 Abre:
 
 ```text
-https://TU-WORKER.workers.dev/api/health
+https://juego.rsoengasgonzalez.workers.dev/api/health
 ```
 
-Con D1 preparada debe responder:
+La respuesta correcta es similar a:
 
 ```json
-{"ok":true,"game":"ready","database":"ready","mode":"shared"}
+{
+  "ok": true,
+  "game": "ready",
+  "database": "ready",
+  "mode": "persistent",
+  "fixedPairConfigured": true
+}
 ```
 
-Después abre la web en una ventana privada. Registra varios alias: cada alta devolverá su `team` automático y el ranking mostrará la brigada.
+Si `database` devuelve `migration-required`, aplica las migraciones. Si `fixedPairConfigured` es `false`, configura `FIXED_TEAM_CODES` y vuelve a desplegar.
+
+## Puntuación
+
+- Cada misión correcta: **100 puntos**; total de misiones: 500.
+- Acusación: hasta **1.000 puntos**.
+- Bonificación por rapidez: hasta **500 puntos**, disminuyendo a medida que avanza el caso.
+- La tabla `score_events` conserva cada componente de la puntuación.
+- El ranking ordena por puntuación total y, en empate, por menor tiempo empleado.
+
+## API principal
+
+- `POST /api/players`: registra el usuario y asigna equipo; acepta `alias` y `assignmentCode` opcional.
+- `GET /api/game`: devuelve caso, pistas públicas y progreso persistente del equipo autenticado.
+- `POST /api/missions/:missionId/submit`: registra cada intento y completa la misión para todo el equipo.
+- `POST /api/accusations`: exige las cinco misiones y cierra únicamente el expediente del equipo.
+- `GET /api/ranking`: muestra equipos terminados y todavía activos.
+- `GET /api/health`: valida binding y esquema D1.
+
+La autenticación utiliza el token aleatorio devuelto al registrar el alias. Se guarda en el dispositivo y se envía como `Authorization: Bearer ...`.
 
 ## Pruebas
 
@@ -153,22 +194,4 @@ npm test
 npm run check
 ```
 
-La suite comprueba:
-
-- transición exacta de caso en la hora 48;
-- desbloqueos en 0, 3, 6, …, 45 horas;
-- apertura de acusación en la hora 42;
-- ausencia de respuestas y pistas bloqueadas en la API pública;
-- validez y singularidad de los 1.000 casos;
-- reparto equilibrado de 80 jugadores en diez brigadas;
-- apertura de desbordamiento para el jugador 81.
-
-## Ajustes rápidos
-
-- Tamaño de grupo: `AUTO_TEAM_SIZE`.
-- Participación prevista: `EXPECTED_PLAYERS`.
-- Número de casos: `CATALOG_SIZE` (máximo diseñado y probado: 1.000).
-- Fecha de inicio: `CASE_CYCLE_START`.
-- Hora de acusación: `ACCUSATION_OPEN_HOUR` en `src/game-engine.js`.
-
-Si cambias el tamaño de grupo después de que ya haya jugadores asignados, el sistema no mueve personas entre brigadas existentes para no romper grupos sociales ya formados. El nuevo límite se aplica a las siguientes altas.
+Las pruebas comprueban la frontera de 48 horas, los desbloqueos cada 30 minutos, las cinco misiones, la ausencia de respuestas privadas en la API, los 1.000 casos y el reparto equilibrado de grupos.

@@ -1,7 +1,8 @@
 export const CASE_DURATION_HOURS = 48;
-export const CLUE_INTERVAL_HOURS = 3;
-export const CLUE_COUNT = CASE_DURATION_HOURS / CLUE_INTERVAL_HOURS;
-export const ACCUSATION_OPEN_HOUR = 42;
+export const CLUE_INTERVAL_MINUTES = 30;
+export const CLUE_INTERVAL_HOURS = CLUE_INTERVAL_MINUTES / 60;
+export const CLUE_COUNT = 16;
+export const MISSION_COUNT = 5;
 export const DEFAULT_CATALOG_SIZE = 1000;
 export const DEFAULT_CYCLE_START = '2026-11-10T15:00:00.000Z';
 
@@ -118,6 +119,7 @@ export function buildCase(caseIndex) {
   const alibis = shuffled(ALIBIS, random).slice(0, 4);
   const colors = shuffled(COLORS, random).slice(0, 4);
   const objects = shuffled(OBJECTS, random).slice(0, 4);
+  const badges = shuffled(Array.from({ length: 900 }, (_, index) => String(index + 100)), random).slice(0, 4);
   const culpritIndex = Math.floor(random() * 4);
 
   const suspects = names.map((name, index) => ({
@@ -126,7 +128,7 @@ export function buildCase(caseIndex) {
     profession: professions[index],
     relation: relations[index],
     alibi: alibis[index],
-    badgeSuffix: String(100 + Math.floor(random() * 900)),
+    badgeSuffix: badges[index],
     signature: `${objects[index]} · ${colors[index]}`
   }));
   const culprit = suspects[culpritIndex];
@@ -158,6 +160,54 @@ export function buildCase(caseIndex) {
     content
   }));
 
+  const missions = [
+    {
+      id: `m-${normalizedIndex}-timeline`,
+      order: 1,
+      title: 'Reconstruir la ventana temporal',
+      prompt: '¿En qué intervalo sitúa el informe forense la intervención?',
+      unlockAfterClue: 5,
+      options: ['21:42–21:52', '21:58–22:08', '22:11–22:21', '22:25–22:35'],
+      answer: '21:58–22:08'
+    },
+    {
+      id: `m-${normalizedIndex}-access`,
+      order: 2,
+      title: 'Identificar la credencial',
+      prompt: '¿Qué terminación completa corresponde al acceso decisivo?',
+      unlockAfterClue: 7,
+      options: shuffled(suspects.map(suspect => suspect.badgeSuffix), random),
+      answer: culprit.badgeSuffix
+    },
+    {
+      id: `m-${normalizedIndex}-object`,
+      order: 3,
+      title: 'Vincular el objeto',
+      prompt: '¿Qué objeto conecta la escena con la persona responsable?',
+      unlockAfterClue: 9,
+      options: shuffled(suspects.map(suspect => suspect.signature.split(' · ')[0]), random),
+      answer: culprit.signature.split(' · ')[0]
+    },
+    {
+      id: `m-${normalizedIndex}-motive`,
+      order: 4,
+      title: 'Aislar el móvil',
+      prompt: '¿Qué motivo explica mejor el mensaje y el beneficio descubierto?',
+      unlockAfterClue: 12,
+      options: shuffled([motive, ...shuffled(MOTIVES.map(item => item[0]).filter(item => item !== motive), random).slice(0, 3)], random),
+      answer: motive
+    },
+    {
+      id: `m-${normalizedIndex}-method`,
+      order: 5,
+      title: 'Validar el método',
+      prompt: '¿Qué método coincide con las dos pruebas de laboratorio?',
+      unlockAfterClue: 15,
+      options: shuffled([method, ...shuffled(METHODS.map(item => item[0]).filter(item => item !== method), random).slice(0, 3)], random),
+      answer: method
+    }
+  ];
+
   return {
     id: `case-${normalizedIndex}`,
     index: normalizedIndex,
@@ -169,6 +219,7 @@ export function buildCase(caseIndex) {
     synopsis: `Un incidente imposible, cuatro versiones incompatibles y 48 horas para reconstruir lo ocurrido en ${district}.`,
     suspects,
     clues,
+    missions,
     choices: {
       motives: shuffled([motive, ...shuffled(MOTIVES.map(item => item[0]).filter(item => item !== motive), random).slice(0, 3)], random),
       methods: shuffled([method, ...shuffled(METHODS.map(item => item[0]).filter(item => item !== method), random).slice(0, 3)], random),
@@ -205,8 +256,8 @@ export function getCycleState(nowInput = Date.now(), cycleStartInput = DEFAULT_C
     elapsedHours,
     unlockedCount,
     nextClueMs,
-    accusationOpen: started && elapsedHours >= ACCUSATION_OPEN_HOUR,
-    accusationOpenMs: caseStartMs + ACCUSATION_OPEN_HOUR * HOUR_MS
+    accusationOpen: false,
+    accusationOpenMs: null
   };
 }
 
@@ -220,7 +271,8 @@ export function getPublicGame(nowInput = Date.now(), options = {}) {
       ? { ...clue, unlocked: true, unlockAt: new Date(unlockAt).toISOString() }
       : { id: clue.id, number: clue.number, title: clue.title, unlockAtHours: clue.unlockAtHours, unlocked: false, unlockAt: new Date(unlockAt).toISOString() };
   });
-  const { answer, solution, ...safeMystery } = mystery;
+  const { answer, solution, missions, ...safeMystery } = mystery;
+  const publicMissions = missions.map(({ answer: _answer, ...mission }) => mission);
   let previousSolution = null;
   if (cycle.started && cycle.cycleNumber > 0) {
     const previousIndex = (cycle.caseIndex - 1 + cycle.catalogSize) % cycle.catalogSize;
@@ -231,9 +283,10 @@ export function getPublicGame(nowInput = Date.now(), options = {}) {
     serverNow: new Date(nowInput).toISOString(),
     rules: {
       caseDurationHours: CASE_DURATION_HOURS,
+      clueIntervalMinutes: CLUE_INTERVAL_MINUTES,
       clueIntervalHours: CLUE_INTERVAL_HOURS,
       clueCount: CLUE_COUNT,
-      accusationOpenHour: ACCUSATION_OPEN_HOUR,
+      missionCount: MISSION_COUNT,
       catalogSize: cycle.catalogSize
     },
     cycle: {
@@ -243,11 +296,9 @@ export function getPublicGame(nowInput = Date.now(), options = {}) {
       startsAt: new Date(cycle.caseStartMs).toISOString(),
       endsAt: new Date(cycle.caseEndMs).toISOString(),
       nextClueAt: cycle.nextClueMs ? new Date(cycle.nextClueMs).toISOString() : null,
-      accusationOpenAt: new Date(cycle.accusationOpenMs).toISOString(),
-      accusationOpen: cycle.accusationOpen,
       unlockedCount: cycle.unlockedCount
     },
-    case: { ...safeMystery, clues },
+    case: { ...safeMystery, clues, missions: publicMissions },
     previousSolution
   };
 }
@@ -256,7 +307,7 @@ function normalized(value) {
   return String(value || '').trim().toLocaleLowerCase('es-ES');
 }
 
-export function scoreAccusation(mystery, accusation, elapsedHours = ACCUSATION_OPEN_HOUR) {
+export function scoreAccusation(mystery, accusation, elapsedHours = 0) {
   const checks = {
     suspect: accusation.suspectId === mystery.answer.suspectId,
     motive: normalized(accusation.motive) === normalized(mystery.answer.motive),
@@ -264,7 +315,7 @@ export function scoreAccusation(mystery, accusation, elapsedHours = ACCUSATION_O
     location: normalized(accusation.location) === normalized(mystery.answer.location)
   };
   const base = (checks.suspect ? 500 : 0) + (checks.motive ? 200 : 0) + (checks.method ? 200 : 0) + (checks.location ? 100 : 0);
-  const speedBonus = base === 1000 ? Math.max(0, Math.round(100 - Math.max(0, elapsedHours - ACCUSATION_OPEN_HOUR) * 15)) : 0;
+  const speedBonus = base === 1000 ? Math.max(0, Math.round(500 - Math.max(0, elapsedHours) * 20)) : 0;
   return { checks, base, speedBonus, total: base + speedBonus, isCorrect: base === 1000 };
 }
 

@@ -9,13 +9,14 @@ let game = null;
 let profile = storage.get('mm-profile');
 let serverOffset = 0;
 let timerHandle = null;
+let refreshing = false;
 
 function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>'"]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[char]));
+  return String(value ?? '').replace(/[&<>'"]/g, character => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[character]));
 }
 
 async function api(path, options = {}) {
-  const headers = { 'content-type': 'application/json', ...(options.headers || {}) };
+  const headers = { 'content-type':'application/json', ...(options.headers || {}) };
   if (profile?.token) headers.authorization = `Bearer ${profile.token}`;
   const response = await fetch(path, { ...options, headers });
   const data = await response.json().catch(() => ({}));
@@ -30,16 +31,16 @@ async function api(path, options = {}) {
 
 function now() { return Date.now() + serverOffset; }
 function pad(value) { return String(Math.max(0, value)).padStart(2, '0'); }
-function duration(ms) {
-  const total = Math.max(0, Math.floor(ms / 1000));
+function duration(milliseconds) {
+  const total = Math.max(0, Math.floor(milliseconds / 1000));
   const days = Math.floor(total / 86400);
   const hours = Math.floor((total % 86400) / 3600);
   const minutes = Math.floor((total % 3600) / 60);
   const seconds = total % 60;
   return days ? `${days} d ${pad(hours)}:${pad(minutes)}:${pad(seconds)}` : `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 }
-function shortDuration(ms) {
-  const totalMinutes = Math.max(0, Math.ceil(ms / 60000));
+function shortDuration(milliseconds) {
+  const totalMinutes = Math.max(0, Math.ceil(milliseconds / 60000));
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
   return hours ? `${hours} h ${minutes} min` : `${minutes} min`;
@@ -51,16 +52,14 @@ function toast(message) {
   const element = $('#toast');
   element.textContent = message;
   element.classList.add('show');
-  setTimeout(() => element.classList.remove('show'), 2600);
+  setTimeout(() => element.classList.remove('show'), 3000);
 }
 
 function setProfileUi() {
   $('#profileInitial').textContent = profile?.alias?.charAt(0).toUpperCase() || '?';
   $('#aliasInput').value = profile?.alias || '';
-  $('#profileNote').textContent = profile?.team?.name
-    ? `Asignación automática: ${profile.team.name}.`
-    : profile?.localMode ? 'Modo individual activo. Conecta D1 para activar la asignación automática de brigadas.' : '';
-  if ($('#teamPill')) $('#teamPill').textContent = profile?.team?.name || 'Equipo automático · 8 jugadores';
+  $('#profileNote').textContent = profile?.team?.name ? `Equipo: ${profile.team.name}.` : 'La asignación se realizará al registrar el alias.';
+  if ($('#teamPill')) $('#teamPill').textContent = profile?.team?.name || 'Equipo automático';
 }
 
 function fillSelect(selector, items, valueKey, labelKey) {
@@ -74,14 +73,59 @@ function fillSelect(selector, items, valueKey, labelKey) {
   });
 }
 
+function renderMissions() {
+  const progress = game.teamProgress;
+  const missions = progress?.missions || game.case.missions.map(mission => ({ ...mission, status:'locked', attempts:0 }));
+  const completed = progress?.completedCount || 0;
+  $('#missionBadge').textContent = `${completed}/${game.rules.missionCount}`;
+  $('#missionCount').textContent = `${completed} de ${game.rules.missionCount}`;
+  $('#missionNotice').textContent = !profile
+    ? 'Registra tu alias para sincronizar el progreso persistente de tu equipo.'
+    : progress?.state?.status === 'finished'
+      ? `Vuestro equipo terminó el expediente el ${dateTime(progress.state.finishedAt)}.`
+      : `El progreso es compartido por ${game.team?.name || profile.team?.name || 'tu equipo'} y se guarda en D1.`;
+  $('#missionList').innerHTML = missions.map(mission => {
+    const status = mission.status || 'locked';
+    const statusText = status === 'completed' ? 'Completada' : status === 'available' ? 'Disponible' : `Requiere pista ${mission.unlockAfterClue}`;
+    const form = status === 'available' && progress?.state?.status !== 'finished' ? `
+      <form class="mission-form" data-mission-id="${escapeHtml(mission.id)}">
+        <select required><option value="">Selecciona una respuesta</option>${mission.options.map(option => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`).join('')}</select>
+        <button class="primary" type="submit">Comprobar</button>
+      </form>` : '';
+    return `<article class="mission-card ${status}">
+      <span class="mission-state">${status === 'completed' ? '✓' : pad(mission.order)}</span>
+      <div><span class="mission-meta">${statusText} · ${mission.attempts || 0} intentos</span><h3>${escapeHtml(mission.title)}</h3><p>${escapeHtml(mission.prompt)}</p>${form}</div>
+    </article>`;
+  }).join('');
+}
+
+function renderTeamStatus() {
+  const card = $('#teamStatusCard');
+  if (!game.teamProgress) { card.classList.add('hidden'); return; }
+  const progress = game.teamProgress;
+  if (progress.state?.status === 'finished') {
+    card.className = 'solution-card team-finished';
+    card.innerHTML = `<span class="kicker">Expediente cerrado por vuestro equipo</span><h3>${escapeHtml(game.team?.name || profile?.team?.name || 'Equipo')}</h3><p>Habéis terminado antes del límite de 48 horas. El caso continúa abierto para los demás equipos.</p>`;
+  } else {
+    card.className = 'solution-card';
+    card.innerHTML = `<span class="kicker">Progreso del equipo</span><h3>${progress.completedCount} de ${game.rules.missionCount} misiones completadas</h3><p>Cuando completéis todas, la acusación final se abrirá inmediatamente para vuestro equipo.</p>`;
+  }
+  card.classList.remove('hidden');
+}
+
 function renderGame() {
   const mystery = game.case;
+  if (game.team && profile) {
+    profile.team = game.team;
+    storage.set('mm-profile', profile);
+    setProfileUi();
+  }
   $('#caseCode').textContent = mystery.code;
   $('#district').textContent = mystery.district;
   $('#caseTitle').textContent = mystery.title;
   $('#caseSynopsis').textContent = mystery.synopsis;
   $('#catalogPill').textContent = `${game.rules.catalogSize.toLocaleString('es-ES')} casos`;
-  $('#teamPill').textContent = profile?.team?.name || `${game.rules.expectedTeamCount} brigadas · ${game.rules.teamSize} jugadores`;
+  $('#teamPill').textContent = game.team?.name || profile?.team?.name || `${game.rules.expectedTeamCount} brigadas equilibradas`;
   $('#victim').textContent = mystery.victim;
   $('#crimeScene').textContent = mystery.crimeScene;
   $('#locationDetail').textContent = `Distrito: ${mystery.district}. Acceso restringido durante la franja investigada.`;
@@ -91,9 +135,7 @@ function renderGame() {
 
   $('#suspectGrid').innerHTML = mystery.suspects.map((suspect, index) => `
     <article class="suspect-card" data-index="0${index + 1}">
-      <span class="profession">${escapeHtml(suspect.profession)}</span>
-      <h3>${escapeHtml(suspect.name)}</h3>
-      <p>${escapeHtml(suspect.relation)}</p>
+      <span class="profession">${escapeHtml(suspect.profession)}</span><h3>${escapeHtml(suspect.name)}</h3><p>${escapeHtml(suspect.relation)}</p>
       <dl><dt>Coartada</dt><dd>${escapeHtml(suspect.alibi)}</dd><dt>Credencial</dt><dd>Termina en ${escapeHtml(suspect.badgeSuffix)}</dd><dt>Seña personal</dt><dd>${escapeHtml(suspect.signature)}</dd></dl>
     </article>`).join('');
 
@@ -109,11 +151,12 @@ function renderGame() {
     $('#previousSolution').innerHTML = `<span class="kicker">Caso anterior · ${escapeHtml(previous.code)}</span><h3>${escapeHtml(previous.title)}</h3><p>${escapeHtml(previous.solution)}</p>`;
     $('#previousSolution').classList.remove('hidden');
   }
-
   fillSelect('#accusedSuspect', mystery.suspects, 'id', 'name');
   fillSelect('#accusedMotive', mystery.choices.motives);
   fillSelect('#accusedMethod', mystery.choices.methods);
   fillSelect('#accusedLocation', mystery.choices.locations);
+  renderMissions();
+  renderTeamStatus();
   updateAccusationState();
   updateTimers();
   if (timerHandle) clearInterval(timerHandle);
@@ -127,43 +170,52 @@ function updateTimers() {
   const end = new Date(game.cycle.endsAt).getTime();
   const remaining = end - current;
   $('#caseTimer').textContent = duration(remaining);
-  const elapsedRatio = Math.min(1, Math.max(0, (current - start) / (end - start)));
-  $('#caseProgress').style.width = `${elapsedRatio * 100}%`;
-
+  $('#caseProgress').style.width = `${Math.min(1, Math.max(0, (current - start) / (end - start))) * 100}%`;
   if (game.cycle.nextClueAt) {
     const next = new Date(game.cycle.nextClueAt).getTime() - current;
     $('#nextClueTimer').textContent = next > 0 ? shortDuration(next) : 'Ya disponible';
-    $('#nextClueText').textContent = `La siguiente prueba está programada para ${dateTime(game.cycle.nextClueAt)}.`;
+    $('#nextClueText').textContent = `La siguiente pista se publica a las ${dateTime(game.cycle.nextClueAt)}.`;
     if (next <= 0) refreshGameSilently();
   } else {
     $('#nextClueTimer').textContent = 'Todas publicadas';
-    $('#nextClueText').textContent = 'Ya tienes la cadena completa de pruebas.';
+    $('#nextClueText').textContent = 'Ya tienes la cadena completa de pistas.';
   }
-
-  const accusationAt = new Date(game.cycle.accusationOpenAt).getTime();
-  $('#accusationTimer').textContent = current < accusationAt ? `Faltan ${shortDuration(accusationAt - current)}` : 'Acusación abierta';
   if (remaining <= 0) refreshGameSilently();
 }
 
+function normalizePersistentResult(result) {
+  if (!result) return null;
+  if (result.checks) return result;
+  return {
+    total:result.totalScore,
+    missionScore:result.missionScore,
+    base:result.accusationScore,
+    speedBonus:result.speedBonus,
+    isCorrect:Boolean(result.solvedCorrectly),
+    checks:{ suspect:Boolean(result.suspectCorrect), motive:Boolean(result.motiveCorrect), method:Boolean(result.methodCorrect), location:Boolean(result.locationCorrect) }
+  };
+}
+
 function updateAccusationState() {
-  const isOpen = game.cycle.accusationOpen || now() >= new Date(game.cycle.accusationOpenAt).getTime();
-  const saved = storage.get(`mm-result-${game.cycle.number}`);
-  $('#accusationLocked').classList.toggle('hidden', isOpen);
-  $('#accusationForm').classList.toggle('hidden', !isOpen || Boolean(saved));
-  if (saved) renderResult(saved);
+  const progress = game.teamProgress;
+  const finished = progress?.state?.status === 'finished';
+  const open = Boolean(progress?.allMissionsCompleted && !finished);
+  $('#accusationLocked').classList.toggle('hidden', open || finished);
+  $('#accusationForm').classList.toggle('hidden', !open);
+  $('#accusationTimer').textContent = profile ? `${progress?.completedCount || 0} de ${game.rules.missionCount} misiones completadas` : 'Registra tu alias para jugar en equipo';
+  if (finished && progress.result && game.teamSolution) renderResult({ result:normalizePersistentResult(progress.result), solution:game.teamSolution });
+  else $('#accusationResult').classList.add('hidden');
 }
 
 function renderResult(data) {
-  const card = $('#accusationResult');
   const result = data.result;
   const answer = data.solution.answer;
+  const card = $('#accusationResult');
   card.innerHTML = `
-    <span class="kicker">Resultado registrado</span>
-    <div class="score">${result.total} pts</div>
-    <h3>${result.isCorrect ? 'Caso resuelto' : 'Teoría incompleta'}</h3>
-    <ul><li>Persona: ${result.checks.suspect ? 'correcta' : 'incorrecta'}</li><li>Motivo: ${result.checks.motive ? 'correcto' : 'incorrecto'}</li><li>Método: ${result.checks.method ? 'correcto' : 'incorrecto'}</li><li>Lugar: ${result.checks.location ? 'correcto' : 'incorrecto'}</li></ul>
-    <p><b>Solución:</b> ${escapeHtml(data.solution.explanation)}</p>
-    <p><b>Responsable:</b> ${escapeHtml(answer.suspectName)} · <b>Motivo:</b> ${escapeHtml(answer.motive)}</p>`;
+    <span class="kicker">Expediente cerrado por el equipo</span><div class="score">${result.total} pts</div>
+    <h3>${result.isCorrect ? 'Caso resuelto correctamente' : 'Acusación registrada'}</h3>
+    <ul><li>Misiones: ${result.missionScore || 0} puntos</li><li>Persona: ${result.checks.suspect ? 'correcta' : 'incorrecta'}</li><li>Motivo: ${result.checks.motive ? 'correcto' : 'incorrecto'}</li><li>Método: ${result.checks.method ? 'correcto' : 'incorrecto'}</li><li>Lugar: ${result.checks.location ? 'correcto' : 'incorrecto'}</li><li>Bonificación por rapidez: ${result.speedBonus || 0}</li></ul>
+    <p><b>Solución:</b> ${escapeHtml(data.solution.explanation)}</p><p><b>Responsable:</b> ${escapeHtml(answer.suspectName)}</p>`;
   card.classList.remove('hidden');
 }
 
@@ -172,12 +224,10 @@ async function loadRanking() {
   rows.innerHTML = '<div class="empty-row">Actualizando…</div>';
   try {
     const data = await api('/api/ranking');
-    $('#rankingMode').textContent = data.localMode ? 'El juego funciona en modo individual. Activa D1 y aplica la migración para compartir el ranking.' : 'Ranking compartido del expediente actual.';
+    $('#rankingMode').textContent = `${data.finishedTeams} de ${data.activeTeams} equipos han terminado. El caso permanece abierto para los demás hasta ${dateTime(data.caseEndsAt)}.`;
     rows.innerHTML = data.ranking.length ? data.ranking.map((entry, index) => `
-      <div class="ranking-row"><span>${index + 1}</span><span>${escapeHtml(entry.alias)}</span><span>${escapeHtml(entry.teamName || 'Individual')}</span><span class="points">${entry.score}</span></div>`).join('') : '<div class="empty-row">Todavía no hay acusaciones registradas.</div>';
-  } catch (error) {
-    rows.innerHTML = `<div class="empty-row">${escapeHtml(error.message)}</div>`;
-  }
+      <div class="ranking-row"><span>${index + 1}</span><span>${escapeHtml(entry.teamName)}</span><span>${entry.status === 'finished' ? 'Terminado' : 'Investigando'} · ${entry.memberCount}</span><span class="points">${entry.totalScore ?? '—'}</span></div>`).join('') : '<div class="empty-row">Todavía no hay equipos activos.</div>';
+  } catch (error) { rows.innerHTML = `<div class="empty-row">${escapeHtml(error.message)}</div>`; }
 }
 
 async function loadGame() {
@@ -198,17 +248,16 @@ async function loadGame() {
   }
 }
 
-let refreshing = false;
-async function refreshGameSilently() {
+async function refreshGameSilently(force = false) {
   if (refreshing) return;
   refreshing = true;
   try {
     const next = await api('/api/game');
-    if (!game || next.cycle.number !== game.cycle.number || next.cycle.unlockedCount !== game.cycle.unlockedCount) {
+    if (force || !game || next.cycle.number !== game.cycle.number || next.cycle.unlockedCount !== game.cycle.unlockedCount || JSON.stringify(next.teamProgress) !== JSON.stringify(game.teamProgress)) {
       game = next;
       serverOffset = new Date(game.serverNow).getTime() - Date.now();
       renderGame();
-      toast('El expediente se ha actualizado.');
+      if (!force) toast('El expediente se ha actualizado.');
     }
   } finally { refreshing = false; }
 }
@@ -219,6 +268,24 @@ $$('.tab').forEach(button => button.addEventListener('click', () => {
   if (button.dataset.tab === 'ranking') loadRanking();
 }));
 
+$('#missionList').addEventListener('submit', async event => {
+  const form = event.target.closest('.mission-form');
+  if (!form) return;
+  event.preventDefault();
+  if (!profile) { $('#profileDialog').showModal(); return; }
+  const button = form.querySelector('button');
+  button.disabled = true;
+  try {
+    const data = await api(`/api/missions/${encodeURIComponent(form.dataset.missionId)}/submit`, { method:'POST', body:JSON.stringify({ answer:form.querySelector('select').value }) });
+    game.teamProgress = data.progress;
+    renderMissions();
+    renderTeamStatus();
+    updateAccusationState();
+    toast(data.message || 'Progreso guardado.');
+  } catch (error) { toast(error.message); }
+  finally { button.disabled = false; }
+});
+
 $('#profileButton').addEventListener('click', () => { setProfileUi(); $('#profileDialog').showModal(); });
 $('#closeProfile').addEventListener('click', () => $('#profileDialog').close());
 $('#retryButton').addEventListener('click', loadGame);
@@ -226,37 +293,30 @@ $('#refreshRanking').addEventListener('click', loadRanking);
 
 $('#profileForm').addEventListener('submit', async event => {
   event.preventDefault();
-  const alias = $('#aliasInput').value.trim();
+  const button = event.submitter;
+  button.disabled = true;
   try {
-    const data = await api('/api/players', { method:'POST', body:JSON.stringify({ alias }) });
-    profile = { ...data.player, team:data.team || null, localMode:data.localMode };
-  } catch {
-    profile = { id:crypto.randomUUID(), token:crypto.randomUUID(), alias, localMode:true };
-  }
-  storage.set('mm-profile', profile);
-  setProfileUi();
-  $('#profileDialog').close();
-  toast(`Bienvenido, ${profile.alias}.`);
+    const data = await api('/api/players', { method:'POST', body:JSON.stringify({ alias:$('#aliasInput').value.trim(), assignmentCode:$('#assignmentCodeInput').value.trim() }) });
+    profile = { ...data.player, team:data.team || null, localMode:false };
+    storage.set('mm-profile', profile);
+    setProfileUi();
+    $('#profileDialog').close();
+    await refreshGameSilently(true);
+    toast(`Bienvenida/o a ${profile.team?.name || 'tu equipo'}.`);
+  } catch (error) { $('#profileNote').textContent = error.message; }
+  finally { button.disabled = false; }
 });
 
 $('#accusationForm').addEventListener('submit', async event => {
   event.preventDefault();
-  if (!profile) { $('#profileDialog').showModal(); return; }
   const button = event.submitter;
   button.disabled = true;
-  button.textContent = 'Registrando…';
+  button.textContent = 'Cerrando expediente…';
   try {
-    const payload = {
-      suspectId:$('#accusedSuspect').value,
-      motive:$('#accusedMotive').value,
-      method:$('#accusedMethod').value,
-      location:$('#accusedLocation').value
-    };
-    const data = await api('/api/accusations', { method:'POST', body:JSON.stringify(payload) });
-    storage.set(`mm-result-${game.cycle.number}`, data);
-    $('#accusationForm').classList.add('hidden');
+    const data = await api('/api/accusations', { method:'POST', body:JSON.stringify({ suspectId:$('#accusedSuspect').value, motive:$('#accusedMotive').value, method:$('#accusedMethod').value, location:$('#accusedLocation').value }) });
     renderResult(data);
     toast(data.message);
+    await refreshGameSilently(true);
   } catch (error) { toast(error.message); }
   finally { button.disabled = false; button.textContent = 'Registrar acusación'; }
 });

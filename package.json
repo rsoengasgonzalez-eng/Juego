@@ -1,9 +1,9 @@
 {
   "name": "madrid-mystery-48h",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": true,
   "type": "module",
-  "description": "Juego social de misterio: 1.000 casos, ciclos de 48 horas y pistas cada 3 horas.",
+  "description": "Misterio cooperativo persistente: misiones obligatorias, pistas cada 30 minutos y casos de 48 horas.",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",

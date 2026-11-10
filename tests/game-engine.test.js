@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ACCUSATION_OPEN_HOUR,
   CASE_DURATION_HOURS,
   CLUE_COUNT,
   CLUE_INTERVAL_HOURS,
+  CLUE_INTERVAL_MINUTES,
+  MISSION_COUNT,
   buildCase,
   caseFingerprint,
   getCycleState,
@@ -13,7 +14,8 @@ import {
 } from '../src/game-engine.js';
 
 const START = '2026-11-10T15:00:00.000Z';
-const hour = value => new Date(START).getTime() + value * 60 * 60 * 1000;
+const minute = value => new Date(START).getTime() + value * 60 * 1000;
+const hour = value => minute(value * 60);
 
 test('cada expediente dura 48 horas y rota al siguiente', () => {
   assert.equal(CASE_DURATION_HOURS, 48);
@@ -23,42 +25,42 @@ test('cada expediente dura 48 horas y rota al siguiente', () => {
   assert.equal(next.elapsedHours, 0);
 });
 
-test('las 16 pistas se desbloquean exactamente cada 3 horas', () => {
-  assert.equal(CLUE_INTERVAL_HOURS, 3);
+test('las 16 pistas se desbloquean exactamente cada 30 minutos', () => {
+  assert.equal(CLUE_INTERVAL_MINUTES, 30);
+  assert.equal(CLUE_INTERVAL_HOURS, 0.5);
   assert.equal(CLUE_COUNT, 16);
-  assert.equal(getCycleState(hour(0), START).unlockedCount, 1);
-  assert.equal(getCycleState(hour(2.999), START).unlockedCount, 1);
-  assert.equal(getCycleState(hour(3), START).unlockedCount, 2);
-  assert.equal(getCycleState(hour(45), START).unlockedCount, 16);
+  assert.equal(getCycleState(minute(0), START).unlockedCount, 1);
+  assert.equal(getCycleState(minute(29.99), START).unlockedCount, 1);
+  assert.equal(getCycleState(minute(30), START).unlockedCount, 2);
+  assert.equal(getCycleState(minute(450), START).unlockedCount, 16);
 });
 
-test('el servidor no filtra el contenido de pistas bloqueadas ni la solución', () => {
-  const publicGame = getPublicGame(hour(6), { cycleStart: START, catalogSize: 1000 });
+test('el servidor no filtra pistas bloqueadas, respuestas de misión ni solución', () => {
+  const publicGame = getPublicGame(minute(60), { cycleStart:START, catalogSize:1000 });
   assert.equal(publicGame.case.clues.filter(clue => clue.unlocked).length, 3);
-  const locked = publicGame.case.clues.find(clue => !clue.unlocked);
-  assert.equal('content' in locked, false);
+  assert.equal('content' in publicGame.case.clues.find(clue => !clue.unlocked), false);
+  assert.equal(publicGame.case.missions.length, MISSION_COUNT);
+  assert.ok(publicGame.case.missions.every(mission => !('answer' in mission)));
   assert.equal('answer' in publicGame.case, false);
   assert.equal('solution' in publicGame.case, false);
 });
 
-test('la acusación se abre en la hora 42', () => {
-  assert.equal(ACCUSATION_OPEN_HOUR, 42);
-  assert.equal(getCycleState(hour(41.999), START).accusationOpen, false);
-  assert.equal(getCycleState(hour(42), START).accusationOpen, true);
+test('cada caso contiene cinco misiones obligatorias escalonadas', () => {
+  const mystery = buildCase(27);
+  assert.equal(mystery.missions.length, 5);
+  assert.deepEqual(mystery.missions.map(mission => mission.unlockAfterClue), [5, 7, 9, 12, 15]);
+  assert.ok(mystery.missions.every(mission => mission.options.includes(mission.answer)));
+  assert.ok(mystery.missions.every(mission => new Set(mission.options).size === mission.options.length));
 });
 
-test('una acusación completa obtiene 1.000 puntos más bonificación', () => {
+test('una acusación completa obtiene 1.000 puntos y bonificación decreciente', () => {
   const mystery = buildCase(27);
-  const result = scoreAccusation(mystery, {
-    suspectId: mystery.answer.suspectId,
-    motive: mystery.answer.motive,
-    method: mystery.answer.method,
-    location: mystery.answer.location
-  }, 42);
-  assert.equal(result.base, 1000);
-  assert.equal(result.speedBonus, 100);
-  assert.equal(result.total, 1100);
-  assert.equal(result.isCorrect, true);
+  const early = scoreAccusation(mystery, mystery.answer, 8);
+  const late = scoreAccusation(mystery, mystery.answer, 20);
+  assert.equal(early.base, 1000);
+  assert.ok(early.speedBonus > late.speedBonus);
+  assert.equal(early.total, early.base + early.speedBonus);
+  assert.equal(early.isCorrect, true);
 });
 
 test('el catálogo contiene 1.000 expedientes deterministas y válidos', () => {
@@ -67,8 +69,10 @@ test('el catálogo contiene 1.000 expedientes deterministas y válidos', () => {
     const mystery = buildCase(index);
     assert.equal(mystery.suspects.length, 4);
     assert.equal(new Set(mystery.suspects.map(item => item.id)).size, 4);
+    assert.equal(new Set(mystery.suspects.map(item => item.badgeSuffix)).size, 4);
     assert.equal(mystery.clues.length, 16);
-    assert.deepEqual(mystery.clues.map(clue => clue.unlockAtHours), Array.from({ length: 16 }, (_, clueIndex) => clueIndex * 3));
+    assert.deepEqual(mystery.clues.map(clue => clue.unlockAtHours), Array.from({ length:16 }, (_, clueIndex) => clueIndex * 0.5));
+    assert.equal(mystery.missions.length, 5);
     assert.equal(new Set(mystery.choices.motives).size, 4);
     assert.equal(new Set(mystery.choices.methods).size, 4);
     assert.equal(new Set(mystery.choices.locations).size, 4);
