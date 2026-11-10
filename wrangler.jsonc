@@ -4,13 +4,11 @@
   "main": "src/worker.js",
   "compatibility_date": "2026-11-10",
   "workers_dev": true,
-
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application"
   },
-
   "vars": {
     "CASE_CYCLE_START": "2026-11-10T15:00:00.000Z",
     "CATALOG_SIZE": "1000",
@@ -20,7 +18,6 @@
     "FIXED_PLAYER_1": "Vanessita",
     "FIXED_PLAYER_2": "Gatita"
   },
-
   "d1_databases": [
     {
       "binding": "DB",
@@ -29,7 +26,6 @@
       "migrations_dir": "migrations"
     }
   ],
-
   "observability": {
     "enabled": true
   }
