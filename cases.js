@@ -93,15 +93,15 @@ export const CASES = [
         { id: 'm-onda', title: 'Forma de onda', kind: 'Audio', icon: '🎵', body: 'A las 00:41 hay 19 segundos de ultrasonido en el canal auxiliar. No era audible en la sala, pero activó un dispositivo cercano.', hint: 'Busca qué equipo de la cabina puede responder a una señal.' },
         { id: 'm-puerta', title: 'Cierre magnético', kind: 'Informe', icon: '🚪', body: 'La puerta se bloquea automáticamente al detectar humo o gas. El registro marca un cierre de emergencia a las 00:42.', hint: 'La puerta cerrada es una consecuencia, no el truco principal.' }
       ]},
-      { id: 'coartadas', title: 'La mezcla oculta', kicker: 'Día 1', availableAfterHours: 18, clues: [
+      { id: 'coartadas', title: 'La mezcla oculta', kicker: 'Día 1', availableAfterHours: 3, clues: [
         { id: 'm-tableta', title: 'Control remoto', kind: 'Registro', icon: '📲', body: 'La pista auxiliar se cargó desde la tableta de Maya a las 00:39. Ella afirma que una actualización se ejecutó sola.', hint: 'El registro identifica el origen exacto del archivo.' },
         { id: 'm-firma', title: 'Fotos del vestíbulo', kind: 'Imagen', icon: '📸', body: 'Sara aparece firmando discos entre 00:33 y 00:47. Álex estuvo visible en la cabina principal durante todo su set.', hint: 'Dos sospechosos tienen coartadas públicas continuas.' }
       ]},
-      { id: 'giro', title: 'Frecuencias peligrosas', kicker: 'Día 2', availableAfterHours: 42, clues: [
+      { id: 'giro', title: 'Frecuencias peligrosas', kicker: 'Día 2', availableAfterHours:6, clues: [
         { id: 'm-valvula', title: 'Válvula alterada', kind: 'Forense', icon: '🧪', body: 'Un difusor de efectos contenía monóxido en lugar de CO₂. Su receptor inalámbrico fue reprogramado esa tarde.', hint: 'La señal de audio activó a distancia el dispositivo manipulado.' },
         { id: 'm-contrato', title: 'Contrato sin firmar', kind: 'Documento', icon: '📄', body: 'Nora iba a despedir a Maya por vender copias de sesiones inéditas. La reunión estaba prevista para la mañana siguiente.', hint: 'El documento fija un motivo inmediato.' }
       ]},
-      { id: 'final', title: 'Metadatos', kicker: 'Día 3', availableAfterHours: 60, clues: [
+      { id: 'final', title: 'Metadatos', kicker: 'Día 3', availableAfterHours: 9, clues: [
         { id: 'm-meta', title: 'Autor del archivo', kind: 'Digital', icon: '💾', body: 'El archivo de 19 segundos fue exportado desde la cuenta “mcosta-studio” seis horas antes. Incluye el identificador único de la licencia de Maya.', hint: 'Los metadatos vinculan preparación y control remoto.' }
       ]}
     ],
@@ -143,15 +143,15 @@ export const CASES = [
         { id: 'a-tinta', title: 'Tinta demasiado nueva', kind: 'Laboratorio', icon: '🖋️', body: 'Uno de los fragmentos contiene un pigmento sintetizado por primera vez en 1987.', hint: 'Al menos una parte del mapa se fabricó recientemente.' },
         { id: 'a-marca', title: 'Marca en la mesa', kind: 'Objeto', icon: '🔎', body: 'Junto al cuerpo hay una hendidura triangular de 4 mm y restos de cera verde.', hint: 'Compara la forma con las herramientas de los profesionales presentes.' }
       ]},
-      { id: 'coartadas', title: 'El inventario', kicker: 'Día 1', availableAfterHours: 18, clues: [
+      { id: 'coartadas', title: 'El inventario', kicker: 'Día 1', availableAfterHours: 3, clues: [
         { id: 'a-sotano', title: 'Sensor del sótano', kind: 'Registro', icon: '💡', body: 'La luz del archivo se activó con la tarjeta de Elia de 21:04 a 21:29. El crimen ocurrió hacia las 21:17.', hint: 'La permanencia de Elia queda registrada.' },
         { id: 'a-video', title: 'Vídeo de un comprador', kind: 'Vídeo', icon: '🎥', body: 'Ramón aparece conversando al fondo entre 21:12 y 21:20. Clara cruza el pasillo a las 21:15 con una caja cerrada.', hint: 'El vídeo reduce la ventana de oportunidad.' }
       ]},
-      { id: 'giro', title: 'La restauración imposible', kicker: 'Día 2', availableAfterHours: 42, clues: [
+      { id: 'giro', title: 'La restauración imposible', kicker: 'Día 2', availableAfterHours: 6, clues: [
         { id: 'a-punzon', title: 'Juego de herramientas', kind: 'Inventario', icon: '🧰', body: 'Falta un punzón triangular del estuche de Clara. La cavidad vacía contiene la misma cera verde hallada en la mesa.', hint: 'Herramienta, forma y residuo coinciden.' },
         { id: 'a-factura', title: 'Factura cifrada', kind: 'Documento', icon: '🧾', body: 'Eduardo guardaba pagos por “restauraciones” de piezas que nunca existieron. Las transferencias terminan en una cuenta de Clara.', hint: 'Las restauraciones eran la cobertura del negocio.' }
       ]},
-      { id: 'final', title: 'La fibra del embalaje', kicker: 'Día 3', availableAfterHours: 60, clues: [
+      { id: 'final', title: 'La fibra del embalaje', kicker: 'Día 3', availableAfterHours: 9, clues: [
         { id: 'a-fibra', title: 'Caja de conservación', kind: 'Forense', icon: '📦', body: 'La caja de Clara tiene una salpicadura de sangre bajo el forro y contiene el fragmento auténtico que faltaba del mapa.', hint: 'La caja une el arma, el robo y la sustitución.' }
       ]}
     ],
