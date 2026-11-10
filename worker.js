@@ -46,7 +46,7 @@ function createJoinCode() {
 function config(env) {
   return {
     start: env.CASE_CYCLE_START || '2026-11-10T09:00:00+01:00',
-    duration: Number(env.CASE_DURATION_HOURS || 72),
+    duration: Number(env.CASE_DURATION_HOURS || 48),
     maxTeamSize: Number(env.MAX_TEAM_SIZE || 8)
   };
 }
