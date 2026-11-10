@@ -35,21 +35,21 @@ export const CASES = [
         ]
       },
       {
-        id: 'coartadas', title: 'Coartadas cruzadas', kicker: 'Día 1', availableAfterHours: 18,
+        id: 'coartadas', title: 'Coartadas cruzadas', kicker: 'Día 1', availableAfterHours: 3,
         clues: [
           { id: 'r-llamada', title: 'Llamada de Inés', kind: 'Registro', icon: '📱', body: 'La llamada de Inés comenzó a las 22:10 y duró 14 minutos. Una fotografía de un invitado la sitúa junto al estanque a las 22:18.', hint: 'Su coartada está respaldada por dos fuentes independientes.' },
           { id: 'r-ticket', title: 'Ticket del aparcamiento', kind: 'Documento', icon: '🧾', body: 'El coche de Darío salió a las 22:13. El lector de matrícula confirma que conducía él.', hint: 'Darío ya estaba fuera antes del intervalo crítico.' }
         ]
       },
       {
-        id: 'giro', title: 'El dato que no encaja', kicker: 'Día 2', availableAfterHours: 42,
+        id: 'giro', title: 'El dato que no encaja', kicker: 'Día 2', availableAfterHours: 6,
         clues: [
           { id: 'r-polvo', title: 'Análisis del polvo', kind: 'Laboratorio', icon: '🔬', body: 'El polvo del reloj es grafito conductor, usado esa noche para suavizar los raíles de los focos. Solo el equipo de iluminación recibió ese material.', hint: 'El grafito conecta físicamente la escena con una función concreta.' },
           { id: 'r-correo', title: 'Borrador de correo', kind: 'Correo', icon: '✉️', body: 'Álvaro iba a denunciar facturas infladas por 38.000 €. El proveedor beneficiado pertenece a una empresa administrada por el hermano de Bruno.', hint: 'El correo aporta el motivo económico y el vínculo familiar.' }
         ]
       },
       {
-        id: 'final', title: 'La última pieza', kicker: 'Día 3', availableAfterHours: 60,
+        id: 'final', title: 'La última pieza', kicker: 'Día 3', availableAfterHours: 9,
         clues: [
           { id: 'r-fibra', title: 'Fibra en la herida', kind: 'Forense', icon: '🧵', body: 'La fibra coincide con la cinta negra de sujeción de un contrapeso. En el carro técnico de Bruno falta una pieza metálica de 1,8 kg.', hint: 'La cinta y el objeto ausente determinan el método.' }
         ]
