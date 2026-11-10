@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0d1017" />
+  <meta name="description" content="Madrid Mystery: un nuevo caso para resolver en equipo cada 72 horas." />
+  <meta property="og:title" content="Madrid Mystery — ¿Quién lo hizo?" />
+  <meta property="og:description" content="Tienes 72 horas para resolver el caso con tu equipo." />
+  <meta property="og:type" content="website" />
+  <title>Madrid Mystery</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icon.svg" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="Madrid Mystery, inicio">
+      <span class="brand-mark">M</span>
+      <span><strong>Madrid</strong><small>Mystery</small></span>
+    </a>
+    <button id="shareButton" class="icon-button" type="button" aria-label="Compartir por WhatsApp">↗</button>
+  </header>
+
+  <main id="app" aria-live="polite">
+    <section class="loading-card"><div class="spinner"></div><p>Abriendo el expediente…</p></section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <template id="authTemplate">
+    <section class="entry-card panel">
+      <p class="eyebrow">ACCESO CONFIDENCIAL</p>
+      <h2>Elige tu alias</h2>
+      <p>No pedimos teléfono ni nombre real. Este alias será visible para tu equipo.</p>
+      <form id="aliasForm" class="stack-form">
+        <label>Alias<input name="alias" minlength="2" maxlength="24" autocomplete="nickname" placeholder="Ej. Detective Luna" required /></label>
+        <button class="button primary" type="submit">Entrar en la investigación</button>
+      </form>
+    </section>
+  </template>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

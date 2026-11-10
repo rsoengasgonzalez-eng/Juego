@@ -1,0 +1,12 @@
+{
+  "name": "Madrid Mystery",
+  "short_name": "Mystery",
+  "description": "Un misterio nuevo cada 72 horas para jugar en equipo.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090b10",
+  "theme_color": "#c8ff3d",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
