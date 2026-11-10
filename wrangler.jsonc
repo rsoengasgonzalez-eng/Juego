@@ -4,11 +4,13 @@
   "main": "src/worker.js",
   "compatibility_date": "2026-11-10",
   "workers_dev": true,
+
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application"
   },
+
   "vars": {
     "CASE_CYCLE_START": "2026-11-10T15:00:00.000Z",
     "CATALOG_SIZE": "1000",
@@ -18,14 +20,16 @@
     "FIXED_PLAYER_1": "Vanessita",
     "FIXED_PLAYER_2": "Gatita"
   },
+
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "madrid-mystery-db",
-      "database_id": "622cbc4b-82db-4ebc-ab72-f3209e215e69",
+      "database_id": "9bf4784c-c4de-4882-8522-3353d3184fc9",
       "migrations_dir": "migrations"
     }
   ],
+
   "observability": {
     "enabled": true
   }
