@@ -13,7 +13,7 @@
     "CASE_CYCLE_START": "2026-11-10T15:00:00.000Z",
     "CATALOG_SIZE": "1000",
     "EXPECTED_PLAYERS": "80",
-    "AUTO_TEAM_SIZE": "8",
+    "AUTO_TEAM_SIZE": "5",
     "FIXED_TEAM_NAME": "Dúo especial"
   },
   "d1_databases": [
