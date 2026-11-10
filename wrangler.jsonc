@@ -15,7 +15,6 @@
     "EXPECTED_PLAYERS": "80",
     "AUTO_TEAM_SIZE": "5",
     "FIXED_TEAM_NAME": "Dúo especial"
-    "DEPLOY_VERSION": "v3.1"
   },
   "d1_databases": [
     {
